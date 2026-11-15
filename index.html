@@ -20,7 +20,7 @@ button,.btn{min-height:42px;padding:11px 15px;border-radius:12px;box-shadow:0 2p
 <div id="stockDividends"></div>
 <div class="card" id="manualDivPanel"><h3 id="manualTitle">Ajouter un dividende manuel</h3><div class="formgrid"><div><label>Montant brut par action (€)</label><input id="mAmount" type="number" min="0" step="any"></div><div><label>Année du dividende</label><input id="mYear" type="number" min="2026" max="2035" value="2027"></div><div><label>Date de détachement (facultative)</label><input id="mEx" type="date"></div><div><label>Date de paiement</label><input id="mPay" type="date"></div><div><label>Statut</label><select id="mStatus"><option>Confirmé</option><option>Estimé</option><option>Prévision</option></select></div></div><div class="actions"><button class="primary" id="saveManual">Enregistrer le dividende</button><button id="cancelManual" hidden>Annuler la modification</button></div></div>
 </div>
-<div class="notice">Les prévisions sont récupérées automatiquement depuis le palmarès des dividendes de Boursorama lorsqu’une société y figure. Si elle n’y figure pas, tu peux saisir son dividende manuellement dans « Modifier ». Boursorama publie des estimations annuelles par action, pas toujours les dates de détachement et de paiement.</div>
+<p class="hint" id="dividendStatus">Prévisions Boursorama : pas encore actualisées.</p><div class="notice">Les prévisions sont récupérées automatiquement depuis le palmarès des dividendes de Boursorama lorsqu’une société y figure. Si elle n’y figure pas, tu peux saisir son dividende manuellement dans « Modifier ». Boursorama publie des estimations annuelles par action, pas toujours les dates de détachement et de paiement.</div>
 </section>
 <section id="settings" class="view"><h1>Réglages</h1>
 <div class="card"><h2>Source des cours — Google Sheets CSV</h2><label>Adresse CSV</label><input id="csvUrl" type="url"><div class="actions"><button class="primary" id="saveCsv">Enregistrer</button><button id="refresh2">Actualiser maintenant</button></div><p class="hint">Cours actualisés à l'ouverture et toutes les 15 minutes. Colonnes attendues : ticker et price. Les derniers cours sont conservés si la source est indisponible.</p></div>
@@ -116,7 +116,8 @@ const BOURSORAMA_PROXIES=[
 let preferredProxyIndex=0;
 function cleanName(v){return String(v||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\bSRD\b/g,'').replace(/[^A-Z0-9]/g,'')}
 const BORSA_ALIASES={AI:['AIRLIQUIDE'],AIR:['AIRBUS'],ALO:['ALSTOM'],AMUN:['AMUNDI'],MT:['ARCELORMITTAL'],CS:['AXA'],BNP:['BNPPARIBAS'],EN:['BOUYGUES'],CAP:['CAPGEMINI'],CA:['CARREFOUR'],ACA:['CREDITAGRICOLE','CREDITAGRICOLESA'],BN:['DANONE'],DSY:['DASSAULTSYSTEMES'],EDEN:['EDENRED'],ENGI:['ENGIE'],EL:['ESSILORLUXOTTICA'],ERF:['EUROFINSSCIENTIFIC'],RMS:['HERMES'],KER:['KERING'],LR:['LEGRAND'],OR:['LOREAL'],MC:['LVMH'],ML:['MICHELIN'],ORA:['ORANGE'],RI:['PERNODRICARD'],PUB:['PUBLICIS','PUBLICISGROUPE'],RNO:['RENAULT'],SAF:['SAFRAN'],SGO:['SAINTGOBAIN'],SAN:['SANOFI'],SU:['SCHNEIDERELECTRIC'],GLE:['SOCIETEGENERALE'],STLAP:['STELLANTIS'],STMPA:['STMICROELECTRONICS'],HO:['THALES'],TTE:['TOTALENERGIES'],URW:['UNIBAILRODAMCOWESTFIELD'],VIE:['VEOLIA'],DG:['VINCI'],AC:['ACCOR'],ADP:['ADP'],FGR:['EIFFAGE'],COFA:['COFACE'],COV:['COVIVIO'],GFC:['GECINA'],LI:['KLEPIERRE'],RXL:['REXEL'],RUI:['RUBIS'],SW:['SODEXO'],TEP:['TELEPERFORMANCE'],VK:['VALLOUREC']};
-function matchBoursorama(company,p){const n=cleanName(company),pn=cleanName(p.name),aliases=(BORSA_ALIASES[normTicker(p.ticker)]||[]).map(cleanName);if(!n)return false;return (!!pn&&pn.length>=4&&(n===pn||n.includes(pn)||pn.includes(n)))||aliases.some(a=>a.length>=4&&n.includes(a))}
+function aliasesFor(p){return [cleanName(p.name),...(BORSA_ALIASES[normTicker(p.ticker)]||[]).map(cleanName)].filter(x=>x.length>=3)}
+function matchBoursorama(company,p){const n=cleanName(company);return !!n&&aliasesFor(p).some(a=>n.includes(a)||a.includes(n))}
 async function fetchViaProxy(pageUrl){
  let lastError='aucun relais n’a répondu';
  const order=[preferredProxyIndex,...BOURSORAMA_PROXIES.map((_,i)=>i).filter(i=>i!==preferredProxyIndex)];
@@ -135,49 +136,44 @@ async function fetchViaProxy(pageUrl){
  }
  throw Error(lastError);
 }
+function cellText(c){return String(c?.innerText||c?.textContent||'').replace(/\s+/g,' ').trim()}
 function extractBoursoramaRows(doc){
  const out=[];
  for(const table of doc.querySelectorAll('table')){
-  const trs=[...table.querySelectorAll('tr')];
-  let headerInfo=null;
+  const trs=[...table.querySelectorAll('tr')];let header=null;
+  for(const tr of trs){const cells=[...tr.querySelectorAll('th,td')],labels=cells.map(c=>cleanName(cellText(c)));let ix=labels.findIndex(x=>x.includes('DIV2027'));let year=2027;if(ix<0){ix=labels.findIndex(x=>x.includes('DIV2026'));year=2026}if(ix>=0){header={ix,year,count:cells.length};break}}
+  if(!header)continue;
   for(const tr of trs){
-   const cells=[...tr.querySelectorAll('th,td')];
-   const labels=cells.map(x=>cleanName(x.textContent));
-   let ix=labels.findIndex(x=>x.includes('DIV2027')),year=2027;
-   if(ix<0){ix=labels.findIndex(x=>x.includes('DIV2026'));year=2026}
-   if(ix>=0){headerInfo={ix,year};break}
-  }
-  if(!headerInfo)continue;
-  for(const tr of trs){
-   const cells=[...tr.querySelectorAll(':scope > th, :scope > td')];
-   if(cells.length<=headerInfo.ix)continue;
-   const rowText=(tr.innerText||tr.textContent||'').replace(/\s+/g,' ').trim();
-   if(!rowText)continue;
-   // Boursorama may prepend technical/action cells: retain the complete row for matching.
-   const nameCell=cells.find(c=>c.querySelector('a'))||cells.find(c=>/[A-Za-zÀ-ÿ]{3}/.test(c.textContent||''));
-   const name=(nameCell?.innerText||nameCell?.textContent||'').replace(/\s+/g,' ').trim();
-   const raw=(cells[headerInfo.ix]?.innerText||cells[headerInfo.ix]?.textContent||'').trim();
-   if(raw)out.push({name,raw,year:headerInfo.year,rowText});
+   const cells=[...tr.children].filter(c=>/^(TD|TH)$/.test(c.tagName));if(!cells.length)continue;
+   const rowText=cellText(tr);if(!rowText)continue;
+   const raw=cellText(cells[header.ix]);
+   const anchors=[...tr.querySelectorAll('a')].map(cellText).filter(Boolean);
+   const name=anchors[0]||cellText(cells.find(c=>/[A-Za-zÀ-ÿ]{3}/.test(cellText(c))))||'';
+   // Store all cells too: a fallback can recover from Boursorama's extra technical columns.
+   out.push({name,raw,year:header.year,rowText,cells:cells.map(cellText)});
   }
  }
  return out;
 }
+function parseDividendAmount(raw){let x=String(raw||'').replace(/[^0-9,.-]/g,'').trim();if(!x)return null;if(x.includes(',')&&x.includes('.'))x=x.lastIndexOf(',')>x.lastIndexOf('.')?x.replace(/\./g,'').replace(',','.'):x.replace(/,/g,'');else x=x.replace(',','.');const n=Number(x);return Number.isFinite(n)&&n>0?n:null}
+function findBoursoramaRow(rows,p){
+ const aliases=aliasesFor(p);
+ return rows.find(r=>{const whole=cleanName(r.rowText);return aliases.some(a=>whole.includes(a))});
+}
 async function fetchBoursoramaDividends(showMessage=true){
- const status=document.getElementById('lastUpdate');
+ const status=document.getElementById('dividendStatus');
  try{
-  status.textContent='Récupération des prévisions Boursorama (plusieurs relais)…';
+  status.textContent='Récupération des prévisions Boursorama…';
   const pageUrls=[BOURSORAMA_URL,...[2,3,4,5].map(n=>BOURSORAMA_URL+'page-'+n)];
-  const allRows=[];let successfulPages=0,relayNames=new Set();
-  for(const pageUrl of pageUrls){
-   try{const result=await fetchViaProxy(pageUrl);const rows=extractBoursoramaRows(result.doc);if(rows.length){allRows.push(...rows);successfulPages++;relayNames.add(result.relay)}}catch(e){/* on poursuit les autres pages et relais */}
-  }
-  if(!successfulPages||!allRows.length)throw Error('Impossible de lire le tableau Boursorama avec les relais gratuits (AllOrigins, CORSProxy, CodeTabs et Isomorphic).');
-  let updated=0,manualKept=0,notFound=[];
+  const allRows=[];let successfulPages=0;const relayNames=new Set();
+  for(const pageUrl of pageUrls){try{const result=await fetchViaProxy(pageUrl);const rows=extractBoursoramaRows(result.doc);if(rows.length){allRows.push(...rows);successfulPages++;relayNames.add(result.relay)}}catch(e){}}
+  if(!successfulPages||!allRows.length)throw Error('Impossible de lire les lignes du palmarès Boursorama.');
+  let updated=0,manualKept=0;const notFound=[],invalid=[];
   for(const p of data.positions){
-   const match=allRows.find(r=>matchBoursorama(r.name,p)||matchBoursorama(r.rowText,p));
+   const match=findBoursoramaRow(allRows,p);
    if(!match){notFound.push(p.ticker);continue}
-   const amount=Number(String(match.raw).replace(/[^\d,.-]/g,'').replace(',','.'));
-   if(!Number.isFinite(amount)||amount<=0)continue;
+   let amount=parseDividendAmount(match.raw);
+   if(amount===null){invalid.push(p.ticker);continue}
    const year=match.year||2027;
    const existing=data.dividends.find(d=>normTicker(d.ticker)===normTicker(p.ticker)&&Number(d.forecastYear||2027)===year);
    if(existing&&(existing.manualOverride||existing.manual)){manualKept++;continue}
@@ -185,7 +181,7 @@ async function fetchBoursoramaDividends(showMessage=true){
    if(existing)Object.assign(existing,forecast);else data.dividends.push(forecast);updated++;
   }
   data.boursoramaLastUpdate=new Date().toISOString();save();
-  status.textContent=`Boursorama : ${updated} prévision(s) actualisée(s) sur ${successfulPages} page(s) via ${[...relayNames].join(', ')}, ${manualKept} correction(s) manuelle(s) conservée(s).`+(notFound.length?' Non trouvées : '+notFound.join(', '):'');
+  status.textContent=`Boursorama : ${updated} prévision(s) actualisée(s) sur ${successfulPages} page(s) via ${[...relayNames].join(', ')} ; ${manualKept} correction(s) manuelle(s) conservée(s).`+(notFound.length?' Non trouvées : '+notFound.join(', '):'')+(invalid.length?' Valeur(s) illisible(s) : '+invalid.join(', '):'');
   if(showMessage)alert(status.textContent);
  }catch(err){status.textContent='Prévisions Boursorama non actualisées : '+err.message+' Les saisies manuelles restent disponibles.';if(showMessage)alert(status.textContent)}
 }

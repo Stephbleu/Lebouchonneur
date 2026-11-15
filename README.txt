@@ -21,3 +21,11 @@ Fonctions conservées
 
 À savoir
 Les relais publics et le HTML de Boursorama peuvent évoluer ou être indisponibles. La récupération automatique n'est donc pas garantie. Les prévisions Boursorama sont des estimations annuelles, pas des dividendes officiellement confirmés. Les données du portefeuille restent stockées dans le navigateur ; exporte régulièrement une sauvegarde JSON.
+
+
+Corrections V5.4 :
+- Correspondance explicite des tickers avec les libellés Boursorama (AI/Air Liquide, TTE/TotalEnergies, SAF/Safran).
+- Recherche du libellé dans toute la ligne du tableau, sans dépendre de la première cellule.
+- Lecture du montant à partir de la colonne identifiée par l’en-tête Div. 2027 (ou Div. 2026 si 2027 est absent).
+- Statut des dividendes séparé du statut des cours, afin que l’actualisation des cours ne l’efface plus.
+- Les corrections manuelles restent prioritaires et ne sont pas écrasées.
