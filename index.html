@@ -40,7 +40,7 @@ function parseCSV(text){
   if(!rows.length) throw Error('Aucune ligne dans le CSV');
   return rows;
 }
-function normTicker(v){return String(v??'').replace(/^\uFEFF/,'').trim().replace(/^["']|["']$/g,'').replace(/\s+/g,'').toUpperCase();}
+function normTicker(v){return String(v??'').replace(/^\\uFEFF/,'').trim().replace(/^["']|["']$/g,'').replace(/\\s+/g,'').toUpperCase().replace(/^[A-Z0-9_-]+:/,'');}
 function normHeader(v){return String(v??'').replace(/^\uFEFF/,'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');}
 function parsePrice(v){
   let x=String(v??'').trim().replace(/[€\s\u00a0]/g,'');
