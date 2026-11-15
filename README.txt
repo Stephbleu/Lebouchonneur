@@ -1,10 +1,32 @@
-LE BOUCHONNEUR — VERSION 3.0
-Déploiement : décompresser l'archive et copier le contenu du dossier portefeuille-boursier-v3 à la racine du dépôt GitHub Pages. Remplacer les fichiers existants, attendre la publication, puis ouvrir dans Chrome Android et choisir Installer l'application dans le menu.
+LE BOUCHONNEUR — VERSION 4.0
 
-Inclus : bandeau et icônes de marque, PWA standalone, portefeuille local, PRU/valorisation/plus-value, cours via CSV préconfiguré, mise à jour à l'ouverture et toutes les 15 minutes, bouton manuel, conservation des derniers cours si hors ligne, dividendes avec détachement/paiement/montant/statut, estimation nette CTO paramétrable, export/import JSON.
+Installation / mise à jour
+1. Décompresse l'archive.
+2. Dans le dépôt GitHub Pages existant, remplace les anciens fichiers par ceux du dossier portefeuille-boursier-v3.
+3. Conserve bien le dossier assets avec ses images.
+4. Attends quelques instants puis recharge le site. Si l'ancienne version reste affichée, ferme puis rouvre Chrome ou vide le cache du site.
 
-CSV : ton lien Google Sheets est renseigné par défaut. Format attendu : deux colonnes ticker et price. Le fichier doit rester publié en accès public.
+Nouveautés V4
+- Deux graphiques en camembert sur l'accueil : répartition du portefeuille et dividendes nets estimés par action.
+- Plus de page séparée « Dividendes ».
+- Bouton « Modifier » sur chaque ligne du portefeuille : modification de la quantité et du cours.
+- Dans ce même panneau, gestion des dividendes de l'action : montant brut par action, date de détachement, date de paiement et statut.
+- Import des dividendes par fichier CSV depuis le portefeuille.
+- Les modifications manuelles restent prioritaires et ne sont pas écrasées par les imports.
+- Après versement, le bouton « Supprimer la modification manuelle » permet de revenir à la donnée importée. Si la ligne était uniquement manuelle, elle est supprimée.
+- Les cours continuent à être importés depuis le CSV Google Sheets configuré dans les réglages, à l'ouverture et toutes les 15 minutes.
+- Sauvegarde et restauration JSON conservées.
 
-Limites : les cours proviennent de ton Google Sheets et peuvent être différés. Cette V3 ne récupère pas automatiquement les dates/montants de dividendes auprès d'un fournisseur externe : la saisie et la correction sont manuelles pour éviter d'afficher des données inventées. Le taux fiscal initial 31,4 % est une hypothèse modifiable, à vérifier selon les règles en vigueur et ta situation. Les estimations ne sont pas un conseil fiscal.
+Format du CSV dividendes
+En-têtes obligatoires : ticker, amount, exDate
+En-têtes facultatifs : name, payDate, status
+Exemple :
+ticker,name,amount,exDate,payDate,status
+AI,Air Liquide,3.30,2027-05-18,2027-05-20,Prévision
+TTE,TotalEnergies,3.22,2027-06-30,2027-07-02,Confirmé
 
-Les positions sont stockées localement dans le navigateur/appareil. Exporter régulièrement un JSON de sauvegarde.
+Les dates doivent être au format AAAA-MM-JJ. Le montant est le dividende brut par action en euros.
+L'application ne récupère pas automatiquement les dividendes depuis les sites des sociétés : l'import se fait à partir d'un fichier CSV que tu fournis. Les prévisions doivent être vérifiées auprès des sociétés avant toute décision.
+
+Données
+Les positions et dividendes sont stockés dans le navigateur (localStorage). Exporte régulièrement une sauvegarde JSON, notamment avant une mise à jour ou un changement d'appareil.
