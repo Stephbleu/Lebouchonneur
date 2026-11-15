@@ -18,7 +18,69 @@ function removePos(i){if(confirm('Supprimer cette position ?')){data.positions.s
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===b.dataset.view))});
 showAdd.onclick=()=>addPanel.hidden=false;cancelAdd.onclick=()=>addPanel.hidden=true;addPosition.onclick=()=>{let p={name:pName.value.trim(),ticker:pTicker.value.trim().toUpperCase(),qty:+pQty.value,price:+pPrice.value};if(!p.name||!p.ticker||p.qty<=0||p.price<0)return alert('Vérifie les champs.');data.positions.push(p);['stockSearch','pName','pTicker','pQty','pPrice'].forEach(id=>document.getElementById(id).value='');addPanel.hidden=true;save()};
 showDivAdd.onclick=()=>divAddPanel.hidden=false;cancelDivAdd.onclick=()=>divAddPanel.hidden=true;addDividend.onclick=()=>{let d={name:dName.value.trim(),ticker:dTicker.value.trim().toUpperCase(),amount:+dAmount.value,exDate:dEx.value,payDate:dPay.value,status:dStatus.value,manual:true};if(!d.name||!d.ticker||d.amount<0||!d.exDate)return alert('Renseigne société, ticker, montant et date.');data.dividends.push(d);['dName','dTicker','dAmount','dEx','dPay'].forEach(id=>document.getElementById(id).value='');divAddPanel.hidden=true;save()};
-async function updatePrices(){try{if(!data.csvUrl)throw Error('Adresse CSV absente');let r=await fetch(data.csvUrl,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);let lines=(await r.text()).trim().split(/\r?\n/),sep=lines[0].includes(';')?';':',',h=lines.shift().split(sep).map(x=>x.replace(/^"|"$/g,'').trim().toLowerCase()),ti=h.indexOf('ticker'),pi=h.indexOf('price');if(ti<0||pi<0)throw Error('Colonnes ticker et price absentes');let map={};lines.forEach(l=>{let c=l.split(sep).map(x=>x.replace(/^"|"$/g,'').trim()),n=Number(c[pi].replace(',','.'));if(c[ti]&&n>0)map[c[ti].toUpperCase()]=n});let count=0;data.positions.forEach(p=>{if(map[p.ticker.toUpperCase()]!==undefined){p.price=map[p.ticker.toUpperCase()];count++}});if(!count)throw Error('Aucun ticker correspondant');data.lastUpdate=new Date().toISOString();save()}catch(e){console.warn(e);document.getElementById('lastUpdate').textContent='Actualisation impossible — derniers cours conservés. '+e.message}}
+function parseCSV(text){
+  text=String(text||'').replace(/^\uFEFF/,'').trim();
+  if(!text) throw Error('Fichier CSV vide');
+  const first=text.split(/\r?\n/,1)[0];
+  const candidates=[',',';','\t'];
+  const sep=candidates.sort((a,b)=>(first.split(b).length-first.split(a).length))[0];
+  const rows=[]; let row=[], field='', quoted=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i], next=text[i+1];
+    if(ch==='"' && quoted && next==='"'){field+='"';i++;}
+    else if(ch==='"'){quoted=!quoted;}
+    else if(ch===sep && !quoted){row.push(field);field='';}
+    else if((ch==='\n'||ch==='\r')&&!quoted){
+      if(ch==='\r'&&next==='\n')i++;
+      row.push(field); if(row.some(v=>v.trim()!==''))rows.push(row);
+      row=[];field='';
+    } else field+=ch;
+  }
+  row.push(field); if(row.some(v=>v.trim()!==''))rows.push(row);
+  if(!rows.length) throw Error('Aucune ligne dans le CSV');
+  return rows;
+}
+function normTicker(v){return String(v??'').replace(/^\uFEFF/,'').trim().replace(/^["']|["']$/g,'').replace(/\s+/g,'').toUpperCase();}
+function normHeader(v){return String(v??'').replace(/^\uFEFF/,'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');}
+function parsePrice(v){
+  let x=String(v??'').trim().replace(/[€\s\u00a0]/g,'');
+  if(x.includes(',')&&x.includes('.')) x=x.lastIndexOf(',')>x.lastIndexOf('.')?x.replace(/\./g,'').replace(',','.'):x.replace(/,/g,'');
+  else x=x.replace(',','.');
+  const n=Number(x); return Number.isFinite(n)&&n>0?n:null;
+}
+async function updatePrices(){
+  try{
+    if(!data.csvUrl) throw Error('Adresse CSV absente');
+    const r=await fetch(data.csvUrl,{cache:'no-store'});
+    if(!r.ok) throw Error('HTTP '+r.status);
+    const rows=parseCSV(await r.text());
+    const headers=rows.shift().map(normHeader);
+    const ti=headers.findIndex(x=>['ticker','symbole','symbol','code'].includes(x));
+    const pi=headers.findIndex(x=>['price','cours','last','close','derniercours'].includes(x));
+    if(ti<0||pi<0) throw Error('Colonnes ticker/symbole et price/cours introuvables. En-têtes lus : '+headers.join(', '));
+    const map={};
+    rows.forEach(c=>{
+      const t=normTicker(c[ti]), n=parsePrice(c[pi]);
+      if(t&&n!==null) map[t]=n;
+    });
+    let count=0, missing=[];
+    data.positions.forEach(p=>{
+      const t=normTicker(p.ticker);
+      let price=map[t];
+      if(price===undefined && t.endsWith('.PA')) price=map[t.slice(0,-3)];
+      if(price===undefined && !t.endsWith('.PA')) price=map[t+'.PA'];
+      if(price!==undefined){p.price=price;count++;}
+      else missing.push(t);
+    });
+    if(!count) throw Error('Aucun ticker correspondant. Tickers du portefeuille : '+data.positions.map(p=>normTicker(p.ticker)).join(', ')+' ; premiers tickers du CSV : '+Object.keys(map).slice(0,12).join(', '));
+    data.lastUpdate=new Date().toISOString();
+    save();
+    if(missing.length) document.getElementById('lastUpdate').textContent='Cours actualisés pour '+count+' valeur(s). Non trouvés : '+missing.join(', ');
+  }catch(e){
+    console.warn(e);
+    document.getElementById('lastUpdate').textContent='Actualisation impossible — derniers cours conservés. '+e.message;
+  }
+}
 refresh.onclick=updatePrices;refresh2.onclick=updatePrices;saveCsv.onclick=()=>{data.csvUrl=csvUrl.value.trim();save();alert('Lien CSV enregistré.')};saveTax.onclick=()=>{let n=+taxInput.value;if(n<0||n>100)return alert('Taux invalide');data.taxRate=n;save()};
 exportData.onclick=()=>{let a=document.createElement('a'),u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.href=u;a.download='le-bouchonneur-sauvegarde.json';a.click();URL.revokeObjectURL(u)};importData.onchange=async e=>{try{let x=JSON.parse(await e.target.files[0].text());if(!Array.isArray(x.positions)||!Array.isArray(x.dividends))throw 0;data={...data,...x};save();alert('Sauvegarde importée.')}catch(e){alert('Fichier invalide.')}};resetData.onclick=()=>{if(confirm('Effacer les positions et dividendes ?')){data={positions:[],dividends:[],csvUrl:DEFAULT_CSV,taxRate:31.4,lastUpdate:null};save()}};
 let installPrompt;addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;installBtn.style.display='inline-block'});installBtn.onclick=async()=>{if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null}else alert('Dans Chrome : menu ⋮ puis Installer l’application.')};
