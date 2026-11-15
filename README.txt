@@ -1,4 +1,4 @@
-LE BOUCHONNEUR — VERSION 5.0
+LE BOUCHONNEUR — VERSION 5.1
 
 Mise à jour
 1. Télécharge et décompresse cette archive.
@@ -22,7 +22,7 @@ Portefeuille
 Source et limites importantes
 - Source affichée : https://www.boursorama.com/bourse/actions/palmares/dividendes/
 - Boursorama affiche des estimations annuelles par action (Div. 2026 / Div. 2027). Ces montants ne constituent pas une annonce officielle et ne donnent pas forcément les dates de détachement et de paiement.
-- La page est récupérée via le relais public AllOrigins (api.allorigins.win), car l'application est hébergée sur GitHub Pages et ne peut pas nécessairement lire directement le site Boursorama à cause des règles CORS.
+- La récupération parcourt plusieurs pages du palmarès (jusqu’à la page 5) via le relais public AllOrigins (api.allorigins.win), car l'application est hébergée sur GitHub Pages et ne peut pas nécessairement lire directement le site Boursorama à cause des règles CORS.
 - Ce relais gratuit est un service tiers : il peut être indisponible, limité ou bloqué. Si l'actualisation échoue, les données déjà enregistrées restent présentes et la saisie manuelle reste possible.
 - Le palmarès est une sélection, pas l'ensemble des sociétés cotées. Une société absente est laissée à la saisie manuelle.
 - Le rapprochement se fait par nom de société et une liste d'alias pour les principales valeurs françaises. Vérifie le ticker et le montant affichés lors des premiers tests.
@@ -30,3 +30,5 @@ Source et limites importantes
 Fiscalité et sauvegardes
 - Le taux CTO reste modifiable. Le net est une estimation calculée à partir du taux choisi.
 - Les données sont stockées localement dans le navigateur. Exporte régulièrement une sauvegarde JSON, en particulier avant de changer d'appareil.
+
+Correctif V5.1 : recherche étendue à plusieurs pages du palmarès afin de retrouver les valeurs comme TotalEnergies (TTE), qui ne figurent pas nécessairement sur la première page. Le nombre de pages réellement lues est affiché dans le statut d’actualisation.

@@ -115,24 +115,81 @@ async function fetchBoursoramaDividends(showMessage=true){
  const status=document.getElementById('lastUpdate');
  try{
   status.textContent='Récupération des prévisions Boursorama…';
-  const response=await fetch(BOURSORAMA_PROXY,{cache:'no-store'});if(!response.ok)throw Error('Le relais gratuit est momentanément indisponible.');
-  const html=await response.text(),doc=new DOMParser().parseFromString(html,'text/html');let target=null,idx2027=-1,idx2026=-1;
-  for(const table of doc.querySelectorAll('table')){const heads=[...table.querySelectorAll('thead th')].map(x=>cleanName(x.textContent));idx2027=heads.findIndex(x=>x.includes('DIV2027'));idx2026=heads.findIndex(x=>x.includes('DIV2026'));if(idx2027>=0||idx2026>=0){target=table;break}}
-  if(!target)throw Error('Tableau des prévisions non reconnu sur Boursorama.');
-  const rows=[...target.querySelectorAll('tbody tr')];let updated=0,manualKept=0,notFound=[];
+  // Le palmarès est paginé : TTE n'est pas forcément sur la première page.
+  const pageUrls=[
+   BOURSORAMA_URL,
+   'https://www.boursorama.com/bourse/actions/palmares/dividendes/page-1',
+   'https://www.boursorama.com/bourse/actions/palmares/dividendes/page-2',
+   'https://www.boursorama.com/bourse/actions/palmares/dividendes/page-3',
+   'https://www.boursorama.com/bourse/actions/palmares/dividendes/page-4',
+   'https://www.boursorama.com/bourse/actions/palmares/dividendes/page-5'
+  ];
+  const allRows=[];let yearColumn=-1,year=2027,successfulPages=0;
+  for(const pageUrl of pageUrls){
+   try{
+    const response=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(pageUrl),{cache:'no-store'});
+    if(!response.ok)continue;
+    const html=await response.text();
+    if(!html||html.length<1000)continue;
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    let foundTable=null,idx=-1,foundYear=2027;
+    for(const table of doc.querySelectorAll('table')){
+     const headers=[...table.querySelectorAll('thead th')].map(x=>cleanName(x.textContent));
+     let j=headers.findIndex(x=>x.includes('DIV2027'));
+     if(j>=0){foundTable=table;idx=j;foundYear=2027;break}
+     j=headers.findIndex(x=>x.includes('DIV2026'));
+     if(j>=0){foundTable=table;idx=j;foundYear=2026;break}
+    }
+    if(!foundTable){
+     // Certains rendus exposent les lignes mais pas un THEAD classique.
+     for(const table of doc.querySelectorAll('table')){
+      const txt=cleanName(table.textContent);
+      if(txt.includes('DIV2027')||txt.includes('DIV2026')){foundTable=table;idx=txt.includes('DIV2027')?7:5;foundYear=txt.includes('DIV2027')?2027:2026;break}
+     }
+    }
+    if(!foundTable)continue;
+    const trs=[...foundTable.querySelectorAll('tr')];
+    const headerRow=trs.find(tr=>cleanName(tr.textContent).includes('DIV2027')||cleanName(tr.textContent).includes('DIV2026'));
+    const headerCells=headerRow?[...headerRow.children].map(x=>cleanName(x.textContent)):[];
+    let valueIndex=headerCells.findIndex(x=>x.includes('DIV2027'));
+    if(valueIndex>=0)foundYear=2027;
+    else {valueIndex=headerCells.findIndex(x=>x.includes('DIV2026'));if(valueIndex>=0)foundYear=2026}
+    if(valueIndex<0)valueIndex=idx;
+    for(const tr of trs){
+     const cells=[...tr.querySelectorAll('td')];
+     if(cells.length<4)continue;
+     const rowText=cells.map(c=>c.textContent).join(' ');
+     if(!rowText.trim())continue;
+     const amountText=cells[valueIndex]?.textContent||'';
+     allRows.push({rowText,amountText,year:foundYear});
+    }
+    successfulPages++;
+   }catch(e){/* On poursuit les autres pages même si une page échoue. */}
+  }
+  if(!successfulPages)throw Error('Impossible de lire le palmarès Boursorama. Le relais gratuit peut être bloqué ou indisponible.');
+  let updated=0,manualKept=0,notFound=[];
   for(const p of data.positions){
-   const row=rows.find(r=>matchBoursorama(r.cells[0]?.textContent||r.textContent,p));if(!row){notFound.push(p.ticker);continue}
-   const cells=[...row.cells],year=idx2027>=0?2027:2026,raw=cells[idx2027>=0?idx2027:idx2026]?.textContent||'',amount=Number(raw.replace(/[^\d,.-]/g,'').replace(',','.'));
+   const match=allRows.find(r=>{
+    const rowName=cleanName(r.rowText.split(/\s{2,}/)[0]||r.rowText);
+    return matchBoursorama(rowName,p)||matchBoursorama(r.rowText,p);
+   });
+   if(!match){notFound.push(p.ticker);continue}
+   const amount=Number(String(match.amountText).replace(/[^\d,.-]/g,'').replace(',','.'));
    if(!Number.isFinite(amount)||amount<=0)continue;
+   const year=match.year||2027;
    const existing=data.dividends.find(d=>normTicker(d.ticker)===normTicker(p.ticker)&&Number(d.forecastYear||2027)===year);
    if(existing&&(existing.manualOverride||existing.manual)){manualKept++;continue}
    const forecast={ticker:p.ticker,name:p.name,amount,forecastYear:year,exDate:'',payDate:'',status:'Prévision Boursorama',source:'Boursorama',sourceUrl:BOURSORAMA_URL,updatedAt:new Date().toISOString(),manual:false};
-   if(existing)Object.assign(existing,forecast);else data.dividends.push(forecast);updated++;
+   if(existing)Object.assign(existing,forecast);else data.dividends.push(forecast);
+   updated++;
   }
   data.boursoramaLastUpdate=new Date().toISOString();save();
-  status.textContent=`Boursorama : ${updated} prévision(s) actualisée(s), ${manualKept} correction(s) manuelle(s) conservée(s).`+(notFound.length?' Absentes du palmarès : '+notFound.join(', '):'');
+  status.textContent=`Boursorama : ${updated} prévision(s) actualisée(s) sur ${successfulPages} page(s), ${manualKept} correction(s) manuelle(s) conservée(s).`+(notFound.length?' Absentes du palmarès : '+notFound.join(', '):'');
   if(showMessage)alert(status.textContent);
- }catch(err){status.textContent='Prévisions Boursorama non actualisées : '+err.message+' Les saisies manuelles restent disponibles.';if(showMessage)alert(status.textContent)}
+ }catch(err){
+  status.textContent='Prévisions Boursorama non actualisées : '+err.message+' Les saisies manuelles restent disponibles.';
+  if(showMessage)alert(status.textContent);
+ }
 }
 
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
