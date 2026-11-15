@@ -116,7 +116,7 @@ const BOURSORAMA_PROXIES=[
 let preferredProxyIndex=0;
 function cleanName(v){return String(v||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\bSRD\b/g,'').replace(/[^A-Z0-9]/g,'')}
 const BORSA_ALIASES={AI:['AIRLIQUIDE'],AIR:['AIRBUS'],ALO:['ALSTOM'],AMUN:['AMUNDI'],MT:['ARCELORMITTAL'],CS:['AXA'],BNP:['BNPPARIBAS'],EN:['BOUYGUES'],CAP:['CAPGEMINI'],CA:['CARREFOUR'],ACA:['CREDITAGRICOLE','CREDITAGRICOLESA'],BN:['DANONE'],DSY:['DASSAULTSYSTEMES'],EDEN:['EDENRED'],ENGI:['ENGIE'],EL:['ESSILORLUXOTTICA'],ERF:['EUROFINSSCIENTIFIC'],RMS:['HERMES'],KER:['KERING'],LR:['LEGRAND'],OR:['LOREAL'],MC:['LVMH'],ML:['MICHELIN'],ORA:['ORANGE'],RI:['PERNODRICARD'],PUB:['PUBLICIS','PUBLICISGROUPE'],RNO:['RENAULT'],SAF:['SAFRAN'],SGO:['SAINTGOBAIN'],SAN:['SANOFI'],SU:['SCHNEIDERELECTRIC'],GLE:['SOCIETEGENERALE'],STLAP:['STELLANTIS'],STMPA:['STMICROELECTRONICS'],HO:['THALES'],TTE:['TOTALENERGIES'],URW:['UNIBAILRODAMCOWESTFIELD'],VIE:['VEOLIA'],DG:['VINCI'],AC:['ACCOR'],ADP:['ADP'],FGR:['EIFFAGE'],COFA:['COFACE'],COV:['COVIVIO'],GFC:['GECINA'],LI:['KLEPIERRE'],RXL:['REXEL'],RUI:['RUBIS'],SW:['SODEXO'],TEP:['TELEPERFORMANCE'],VK:['VALLOUREC']};
-function matchBoursorama(company,p){const n=cleanName(company),pn=cleanName(p.name),aliases=(BORSA_ALIASES[normTicker(p.ticker)]||[]).map(cleanName);return !!n&&(n===pn||n.includes(pn)||pn.includes(n)||aliases.some(a=>n===a||n.includes(a)||a.includes(n)))}
+function matchBoursorama(company,p){const n=cleanName(company),pn=cleanName(p.name),aliases=(BORSA_ALIASES[normTicker(p.ticker)]||[]).map(cleanName);if(!n)return false;return (!!pn&&pn.length>=4&&(n===pn||n.includes(pn)||pn.includes(n)))||aliases.some(a=>a.length>=4&&n.includes(a))}
 async function fetchViaProxy(pageUrl){
  let lastError='aucun relais n’a répondu';
  const order=[preferredProxyIndex,...BOURSORAMA_PROXIES.map((_,i)=>i).filter(i=>i!==preferredProxyIndex)];
@@ -139,17 +139,25 @@ function extractBoursoramaRows(doc){
  const out=[];
  for(const table of doc.querySelectorAll('table')){
   const trs=[...table.querySelectorAll('tr')];
-  let header=trs.find(tr=>{const t=cleanName(tr.textContent);return t.includes('DIV2027')||t.includes('DIV2026')});
-  if(!header)continue;
-  const heads=[...header.children].map(x=>cleanName(x.textContent));
-  let ix=heads.findIndex(x=>x.includes('DIV2027')),year=2027;
-  if(ix<0){ix=heads.findIndex(x=>x.includes('DIV2026'));year=2026}
-  if(ix<0)continue;
+  let headerInfo=null;
   for(const tr of trs){
-   if(tr===header)continue;
-   const cells=[...tr.querySelectorAll('td')];if(cells.length<=ix)continue;
-   const name=(cells[0]?.textContent||'').trim(),raw=(cells[ix]?.textContent||'').trim();
-   if(name)out.push({name,raw,year,rowText:tr.textContent});
+   const cells=[...tr.querySelectorAll('th,td')];
+   const labels=cells.map(x=>cleanName(x.textContent));
+   let ix=labels.findIndex(x=>x.includes('DIV2027')),year=2027;
+   if(ix<0){ix=labels.findIndex(x=>x.includes('DIV2026'));year=2026}
+   if(ix>=0){headerInfo={ix,year};break}
+  }
+  if(!headerInfo)continue;
+  for(const tr of trs){
+   const cells=[...tr.querySelectorAll(':scope > th, :scope > td')];
+   if(cells.length<=headerInfo.ix)continue;
+   const rowText=(tr.innerText||tr.textContent||'').replace(/\s+/g,' ').trim();
+   if(!rowText)continue;
+   // Boursorama may prepend technical/action cells: retain the complete row for matching.
+   const nameCell=cells.find(c=>c.querySelector('a'))||cells.find(c=>/[A-Za-zÀ-ÿ]{3}/.test(c.textContent||''));
+   const name=(nameCell?.innerText||nameCell?.textContent||'').replace(/\s+/g,' ').trim();
+   const raw=(cells[headerInfo.ix]?.innerText||cells[headerInfo.ix]?.textContent||'').trim();
+   if(raw)out.push({name,raw,year:headerInfo.year,rowText});
   }
  }
  return out;
