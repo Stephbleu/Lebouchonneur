@@ -1,0 +1,69 @@
+ticker,name,yahoo
+AI,Air Liquide,AI.PA
+AIR,Airbus,AIR.PA
+ALO,Alstom,ALO.PA
+AMUN,Amundi,AMUN.PA
+MT,ArcelorMittal,MT.PA
+CS,AXA,CS.PA
+BNP,BNP Paribas,BNP.PA
+EN,Bouygues,EN.PA
+CAP,Capgemini,CAP.PA
+CA,Carrefour,CA.PA
+ACA,Crédit Agricole,ACA.PA
+BN,Danone,BN.PA
+DSY,Dassault Systèmes,DSY.PA
+EDEN,Edenred,EDEN.PA
+ENGI,Engie,ENGI.PA
+EL,EssilorLuxottica,EL.PA
+ERF,Eurofins Scientific,ERF.PA
+ENX,Euronext,ENX.PA
+RMS,Hermès,RMS.PA
+KER,Kering,KER.PA
+LR,Legrand,LR.PA
+OR,L'Oréal,OR.PA
+MC,LVMH,MC.PA
+ML,Michelin,ML.PA
+ORA,Orange,ORA.PA
+RI,Pernod Ricard,RI.PA
+PUB,Publicis,PUB.PA
+RNO,Renault,RNO.PA
+SAF,Safran,SAF.PA
+SGO,Saint-Gobain,SGO.PA
+SAN,Sanofi,SAN.PA
+SU,Schneider Electric,SU.PA
+GLE,Société Générale,GLE.PA
+STLAP,Stellantis,STLAP.PA
+STMPA,STMicroelectronics,STMPA.PA
+HO,Thales,HO.PA
+TTE,TotalEnergies,TTE.PA
+URW,Unibail-Rodamco-Westfield,URW.PA
+VIE,Veolia,VIE.PA
+DG,Vinci,DG.PA
+AC,Accor,AC.PA
+ADP,ADP,ADP.PA
+AF,Air France-KLM,AF.PA
+ATE,Alten,ATE.PA
+APAM,Aperam,APAM.PA
+AKE,Arkema,AKE.PA
+BB,BIC,BB.PA
+BVI,Bureau Veritas,BVI.PA
+CARM,Carmila,CARM.PA
+CLARI,Clariane,CLARI.PA
+COFA,Coface,COFA.PA
+COV,Covivio,COV.PA
+FGR,Eiffage,FGR.PA
+ELIS,Elis,ELIS.PA
+GFC,Gecina,GFC.PA
+GET,Getlink,GET.PA
+GTT,GTT,GTT.PA
+IPS,Ipsos,IPS.PA
+LI,Klépierre,LI.PA
+NEX,Nexans,NEX.PA
+RXL,Rexel,RXL.PA
+RUI,Rubis,RUI.PA
+SK,SEB,SK.PA
+SW,Sodexo,SW.PA
+SPIE,SPIE,SPIE.PA
+TEP,Teleperformance,TEP.PA
+VK,Vallourec,VK.PA
+MF,Wendel,MF.PA
